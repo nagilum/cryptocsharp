@@ -11,7 +11,8 @@ public class Cryptography {
             /// <param name="publicKey">The created public key.</param>
             /// <param name="privateKey">The created private key.</param>
             /// <param name="keySize">Size of keys.</param>
-            public static void CreateKeys(out string publicKey, out string privateKey, int keySize = 4096) {
+            /// <returns>Success</returns>
+            public static bool CreateKeys(out string publicKey, out string privateKey, int keySize = 4096) {
                 var csp = new CspParameters {
                     ProviderType = 1,
                     Flags = CspProviderFlags.UseArchivableKey,
@@ -22,6 +23,8 @@ public class Cryptography {
                     try {
                         publicKey = rsa.ToXmlString(false);
                         privateKey = rsa.ToXmlString(true);
+
+                        return true;
                     }
                     finally {
                         rsa.PersistKeyInCsp = false;
