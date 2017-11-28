@@ -188,7 +188,9 @@ public class Cryptography {
                 cipher.Clear();
             }
 
-            return decrypted;
+            return decrypted
+                .Where(b => b != 0)
+                .ToArray();
         }
     }
 }
