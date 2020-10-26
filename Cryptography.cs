@@ -243,9 +243,19 @@ public class Cryptography
 
             cipher.Clear();
 
-            return data
-                .Where(b => b != 0)
-                .ToArray();
+            while (true)
+            {
+                if (data.Last() != 0x00)
+                {
+                    break;
+                }
+
+                data = data
+                    .Take(data.Length - 1)
+                    .ToArray();
+            }
+
+            return data;
         }
 
         /// <summary>
