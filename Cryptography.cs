@@ -1,92 +1,136 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-public class Cryptography {
-    public class Asymmetric {
-        public class RSA {
+public class Cryptography
+{
+    public class Asymmetric
+    {
+        public class RSA
+        {
             /// <summary>
-            /// Create public and private keys.
+            /// Create a public and private key.
+            ///
+            /// The RSACryptoServiceProvider supports key sizes from 384
+            /// bits to 16384 bits in increments of 8 bits if you have the
+            /// Microsoft Enhanced Cryptographic Provider installed. It
+            /// supports key sizes from 384 bits to 512 bits in increments
+            /// of 8 bits if you have the Microsoft Base Cryptographic
+            /// Provider installed.
             /// </summary>
             /// <param name="publicKey">The created public key.</param>
             /// <param name="privateKey">The created private key.</param>
             /// <param name="keySize">Size of keys.</param>
-            /// <returns>Success</returns>
-            public static bool CreateKeys(out string publicKey, out string privateKey, int keySize = 4096) {
-                var csp = new CspParameters {
+            public static void CreateKeys(out string publicKey, out string privateKey, int keySize = 4096)
+            {
+                publicKey = null;
+                privateKey = null;
+
+                var csp = new CspParameters
+                {
                     ProviderType = 1,
                     Flags = CspProviderFlags.UseArchivableKey,
                     KeyNumber = (int) KeyNumber.Exchange
                 };
 
-                using (var rsa = new RSACryptoServiceProvider(keySize, csp)) {
-                    try {
-                        publicKey = rsa.ToXmlString(false);
-                        privateKey = rsa.ToXmlString(true);
+                using var rsa = new RSACryptoServiceProvider(keySize, csp);
 
-                        return true;
-                    }
-                    finally {
-                        rsa.PersistKeyInCsp = false;
-                    }
-                }
+                publicKey = rsa.ToXmlString(false);
+                privateKey = rsa.ToXmlString(true);
+
+                rsa.PersistKeyInCsp = false;
             }
 
             /// <summary>
             /// Encrypt data using a public key.
             /// </summary>
             /// <param name="bytes">Bytes to encrypt.</param>
-            /// <param name="publicKey">Public key.</param>
-            /// <returns>Encrypted bytes.</returns>
-            public byte[] Encrypt(byte[] bytes, string publicKey) {
-                var csp = new CspParameters {
+            /// <param name="publicKey">Public key to use.</param>
+            /// <returns>Encrypted data.</returns>
+            public static byte[] Encrypt(byte[] bytes, string publicKey)
+            {
+                var csp = new CspParameters
+                {
                     ProviderType = 1
                 };
 
-                byte[] encrypted;
+                using var rsa = new RSACryptoServiceProvider(csp);
 
-                using (var rsa = new RSACryptoServiceProvider(csp)) {
-                    try {
-                        rsa.FromXmlString(publicKey);
-                        encrypted = rsa.Encrypt(bytes, false);
-                    }
-                    finally {
-                        rsa.PersistKeyInCsp = false;
-                    }
+                rsa.FromXmlString(publicKey);
+                var data = rsa.Encrypt(bytes, false);
+
+                rsa.PersistKeyInCsp = false;
+
+                return data;
+            }
+
+            /// <summary>
+            /// Encrypt data using a public key.
+            /// </summary>
+            /// <param name="input">Data to encrypt.</param>
+            /// <param name="publicKey">Public key to use.</param>
+            /// <returns>Encrypted data.</returns>
+            public static string Encrypt(string input, string publicKey)
+            {
+                if (input == null)
+                {
+                    throw new Exception("Input cannot be null");
                 }
 
-                return encrypted;
+                return Convert.ToBase64String(
+                    Encrypt(
+                        Encoding.UTF8.GetBytes(input),
+                        publicKey));
             }
 
             /// <summary>
             /// Decrypt data using a private key.
             /// </summary>
-            /// <param name="encrypted">Bytes to decrypt.</param>
-            /// <param name="privateKey">Private key.</param>
-            /// <returns>Decrypted bytes.</returns>
-            public byte[] Decrypt(byte[] encrypted, string privateKey) {
-                var csp = new CspParameters {
+            /// <param name="bytes">Bytes to decrypt.</param>
+            /// <param name="privateKey">Private key to use.</param>
+            /// <returns>Decrypted data.</returns>
+            public static byte[] Decrypt(byte[] bytes, string privateKey)
+            {
+                var csp = new CspParameters
+                {
                     ProviderType = 1
                 };
 
-                byte[] bytes;
+                using var rsa = new RSACryptoServiceProvider(csp);
 
-                using (var rsa = new RSACryptoServiceProvider(csp)) {
-                    try {
-                        rsa.FromXmlString(privateKey);
-                        bytes = rsa.Decrypt(encrypted, false);
-                    }
-                    finally {
-                        rsa.PersistKeyInCsp = false;
-                    }
+                rsa.FromXmlString(privateKey);
+                var data = rsa.Decrypt(bytes, false);
+
+                rsa.PersistKeyInCsp = false;
+
+                return data;
+            }
+
+            /// <summary>
+            /// Decrypt data using a private key.
+            /// </summary>
+            /// <param name="input">Base64 data to decrypt.</param>
+            /// <param name="privateKey">Private key to use.</param>
+            /// <returns>Decrypted data.</returns>
+            public static string Decrypt(string input, string privateKey)
+            {
+                if (input == null)
+                {
+                    throw new Exception("Input cannot be null");
                 }
 
-                return bytes;
+                return Encoding.UTF8.GetString(
+                    Decrypt(
+                        Convert.FromBase64String(input),
+                        privateKey));
             }
         }
     }
 
-    public class Symmetric {
+    public class Symmetric
+    {
         /// <summary>
         /// Number of iterations for block chain.
         /// </summary>
@@ -94,6 +138,7 @@ public class Cryptography {
 
         /// <summary>
         /// Key size for encrypting/decrypting.
+        /// The valid key sizes for Rijndael are 128, 192 and 256 bits.
         /// </summary>
         public static int KeySize = 256;
 
@@ -108,89 +153,126 @@ public class Cryptography {
         };
 
         /// <summary>
-        /// Encrypt data using a password and Rijndael.
+        /// Encrypt data using a passphrase and a given algorithm.
+        /// </summary>
+        /// <typeparam name="T">Algorithm to use.</typeparam>
+        /// <param name="bytes">Bytes to encrypt.</param>
+        /// <param name="passphrase">Passphrase to use.</param>
+        /// <returns>Encrypted data.</returns>
+        public static byte[] Encrypt<T>(byte[] bytes, string passphrase) where T : SymmetricAlgorithm, new()
+        {
+            using var cipher = new T();
+
+            var pwdBytes = new Rfc2898DeriveBytes(
+                Encoding.UTF7.GetBytes(passphrase),
+                Salt,
+                Iterations);
+
+            var keyBytes = pwdBytes.GetBytes(KeySize / 8);
+
+            cipher.Mode = CipherMode.CBC;
+
+            using var encryptor = cipher.CreateEncryptor(keyBytes, pwdBytes.GetBytes(16));
+            using var stream = new MemoryStream();
+            using var writer = new CryptoStream(stream, encryptor, CryptoStreamMode.Write);
+
+            writer.Write(bytes, 0, bytes.Length);
+            writer.FlushFinalBlock();
+
+            var data = stream.ToArray();
+
+            cipher.Clear();
+
+            return data;
+        }
+
+        /// <summary>
+        /// Encrypt data using a passphrase and the Rijndael/AES algorithm.
         /// </summary>
         /// <param name="bytes">Bytes to encrypt.</param>
-        /// <param name="password">Password to encrypt with.</param>
-        /// <returns>Encrypted bytes.</returns>
-        public static byte[] Encrypt(byte[] bytes, string password) {
-            return Encrypt<RijndaelManaged>(bytes, password);
+        /// <param name="passphrase">Passphrase to use.</param>
+        /// <returns>Encrypted data.</returns>
+        public static byte[] Encrypt(byte[] bytes, string passphrase)
+        {
+            return Encrypt<RijndaelManaged>(
+                bytes,
+                passphrase);
         }
 
         /// <summary>
-        /// Encrypt data using a password and a given algorithm.
+        /// Encrypt data using a passphrase and the Rijndael/AES algorithm.
         /// </summary>
-        /// <typeparam name="T">Symmetric algorithm to use.</typeparam>
-        /// <param name="bytes">Bytes to encrypt.</param>
-        /// <param name="password">Password to encrypt with.</param>
-        /// <returns>Encrypted bytes.</returns>
-        public static byte[] Encrypt<T>(byte[] bytes, string password) where T : SymmetricAlgorithm, new() {
-            byte[] encrypted;
-
-            using (var cipher = new T()) {
-                var passwordBytes = new Rfc2898DeriveBytes(Encoding.UTF8.GetBytes(password), Salt, Iterations);
-                var keyBytes = passwordBytes.GetBytes(KeySize / 8);
-
-                cipher.Mode = CipherMode.CBC;
-
-                using (var encryptor = cipher.CreateEncryptor(keyBytes, passwordBytes.GetBytes(16))) {
-                    using (var stream = new MemoryStream()) {
-                        using (var writer = new CryptoStream(stream, encryptor, CryptoStreamMode.Write)) {
-                            writer.Write(bytes, 0, bytes.Length);
-                            writer.FlushFinalBlock();
-
-                            encrypted = stream.ToArray();
-                        }
-                    }
-                }
-
-                cipher.Clear();
-            }
-
-            return encrypted;
+        /// <param name="input">Data to encrypt.</param>
+        /// <param name="passphrase">Passphrase to use.</param>
+        /// <returns>Encrypted data.</returns>
+        public static string Encrypt(string input, string passphrase)
+        {
+            return Convert.ToBase64String(
+                Encrypt(
+                    Encoding.UTF8.GetBytes(input),
+                    passphrase));
         }
 
         /// <summary>
-        /// Decrypt data using a password and Rijndael.
+        /// Decrypt data using a passphrase and a given algorithm.
         /// </summary>
-        /// <param name="encrypted">Bytes to decrypt.</param>
-        /// <param name="password">Password to decrypt with.</param>
-        /// <returns>Decrypted bytes.</returns>
-        public static byte[] Decrypt(byte[] encrypted, string password) {
-            return Decrypt<RijndaelManaged>(encrypted, password);
-        }
+        /// <typeparam name="T">Algorithm to use.</typeparam>
+        /// <param name="bytes">Bytes to decrypt.</param>
+        /// <param name="passphrase">Passphrase to use.</param>
+        /// <returns>Decrypted data.</returns>
+        public static byte[] Decrypt<T>(byte[] bytes, string passphrase) where T : SymmetricAlgorithm, new()
+        {
+            using var cipher = new T();
 
-        /// <summary>
-        /// Decrypt data using a password and a given algorithm.
-        /// </summary>
-        /// <typeparam name="T">Symmetric algorithm to use.</typeparam>
-        /// <param name="encrypted">Bytes to decrypt.</param>
-        /// <param name="password">Password to decrypt with.</param>
-        /// <returns>Decrypted bytes.</returns>
-        public static byte[] Decrypt<T>(byte[] encrypted, string password) where T : SymmetricAlgorithm, new() {
-            byte[] decrypted;
+            var pwdBytes = new Rfc2898DeriveBytes(
+                Encoding.UTF7.GetBytes(passphrase),
+                Salt,
+                Iterations);
 
-            using (var cipher = new T()) {
-                var passwordBytes = new Rfc2898DeriveBytes(Encoding.UTF8.GetBytes(password), Salt, Iterations);
-                var keyBytes = passwordBytes.GetBytes(KeySize / 8);
+            var keyBytes = pwdBytes.GetBytes(KeySize / 8);
 
-                cipher.Mode = CipherMode.CBC;
+            cipher.Mode = CipherMode.CBC;
 
-                using (var decrypter = cipher.CreateDecryptor(keyBytes, passwordBytes.GetBytes(16))) {
-                    using (var stream = new MemoryStream(encrypted)) {
-                        using (var reader = new CryptoStream(stream, decrypter, CryptoStreamMode.Read)) {
-                            decrypted = new byte[stream.Length];
-                            reader.Read(decrypted, 0, decrypted.Length);
-                        }
-                    }
-                }
+            using var decryptor = cipher.CreateDecryptor(keyBytes, pwdBytes.GetBytes(16));
+            using var stream = new MemoryStream(bytes);
+            using var reader = new CryptoStream(stream, decryptor, CryptoStreamMode.Read);
 
-                cipher.Clear();
-            }
+            var data = new byte[stream.Length];
 
-            return decrypted
+            reader.Read(data, 0, data.Length);
+
+            cipher.Clear();
+
+            return data
                 .Where(b => b != 0)
                 .ToArray();
+        }
+
+        /// <summary>
+        /// Decrypt data using a passphrase and the Rijndael/AES algorithm.
+        /// </summary>
+        /// <param name="bytes">Bytes to decrypt.</param>
+        /// <param name="passphrase">Passphrase to use.</param>
+        /// <returns>Decrypted data.</returns>
+        public static byte[] Decrypt(byte[] bytes, string passphrase)
+        {
+            return Decrypt<RijndaelManaged>(
+                bytes,
+                passphrase);
+        }
+
+        /// <summary>
+        /// Decrypt data using a passphrase and the Rijndael/AES algorithm.
+        /// </summary>
+        /// <param name="input">Data to decrypt.</param>
+        /// <param name="passphrase">Passphrase to use.</param>
+        /// <returns>Decrypted data.</returns>
+        public static string Decrypt(string input, string passphrase)
+        {
+            return Encoding.UTF8.GetString(
+                Decrypt(
+                    Convert.FromBase64String(input),
+                    passphrase));
         }
     }
 }

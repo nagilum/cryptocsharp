@@ -1,68 +1,32 @@
 ﻿# Cryptography
 
-C# lib to encrypt and decrypt data with symmetric/asymmetric algorithms
+C# library for encrypting and decrypting data using both asymmetric (pub/priv) and symmetric algorithms.
+
+The asymmetric algorithm in use is RSA.
+
+The default symmetric algorithm is Rijndael/AES.
 
 ## Asymmetric
 
-The asymmetric portion of the Cryptography library lets you create and use public and private keys.
+```csharp
+// The default key size for the created keys is 4096, but can be specified as the last parameter.
+Cryptography.Asymmetric.RSA.CreateKeys(out var publicKey, out var privateKey);
 
-### Create Keys
+// Encrypt some data with the public key. Can be passed as byte[] too.
+var encrypted = Cryptography.Asymmetric.RSA.Encrypt("This is a test", publicKey);
 
-```
-// This will create both a public and private key with a 4096 key-size.
-// You can specify your own key-size as the third parameter to the function.
-if (Cryptography.Asymmetric.RSA.CreateKeys(
-    out string publicKey,
-    out string privateKey)) {
-  // Do something fancy with the keys, but
-  // keep the private one secret and safe.
-}
-```
-
-### Encrypt
-
-```
-var encryptedBytes = Cryptography.Asymmetric.RSA.Encrypt(plainBytes, publicKey);
-```
-
-### Decrypt
-
-```
-var decryptedBytes = Cryptography.Asymmetric.RSA.Decrypt(encryptedBytes, privateKey);
+// Decrypt the encrypted data with the private key.
+var decrypted = Cryptography.Asymmetric.RSA.Decrypt(encrypted, privateKey);
 ```
 
 ## Symmetric
 
-The symmetric portion of the Cryptography library lets you encrypt and decrypt large-scale data using a password.
+```csharp
+// Rijndael is assumed if you don't specify a symmetric algorithm.
+var encrypted = Cryptography.Symmetric.Encrypt("This is a test", "This is a passphrase");
 
-### Encrypt
-
-```
-// This will encrypt data using Rijndael.
-var encryptedBytes = Cryptography.Symmetric.Encrypt(plainBytes, password);
-
-// You can specify your own symmetric algorithm, like so..
-var encryptedBytes = Cryptography.Symmetric.Encrypt<RijndaelManaged>(plainBytes, password);
+// Decrypt.
+var decrypted = Cryptography.Symmetric.Decrypt(encrypted, "This is a passphrase");
 ```
 
-### Decrypt
-
-```
-// This will decrypt data using Rijndael.
-var decryptedBytes = Cryptography.Symmetric.Decrypt(encryptedBytes, password);
-
-// As with encrypt, you can specify your own symmetric algorithm, like so..
-var decryptedBytes = Cryptography.Symmetric.Decrypt<RijndaelManaged>(encryptedBytes, password);
-```
-
-### Iterations, KeySize, and Salt
-
-The iterations, key-size, and salt variables are pre-defined in this library, but you can easily change them.
-
-```
-Cryptography.Symmetric.Iterations = 4; // defaults to 2
-
-Cryptography.Symmetric.KeySize = 196; // defaults to 256.
-
-Cryptography.Symmetric.Salt = { ... }; // see source-code for default ;)
-```
+`Iterations`, `KeySize`, and `Salt` can be changed directly on the Symmetric class.
