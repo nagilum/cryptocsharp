@@ -16,8 +16,12 @@ namespace Cryptography
         /// </summary>
         /// <param name="input">Input string.</param>
         /// <param name="passphrase">Passphrase to use.</param>
+        /// <param name="keySize">Key size to set.</param>
         /// <returns>Decrypted string.</returns>
-        public static string Decrypt(string input, string passphrase)
+        public static string Decrypt(
+            string input,
+            string passphrase,
+            int? keySize = null)
         {
             var key = CreateMd5Hash(passphrase);
             var fullCipher = Convert.FromBase64String(input);
@@ -30,6 +34,18 @@ namespace Cryptography
             string result;
 
             using var aes = Aes.Create();
+
+            if (keySize.HasValue &&
+                keySize.Value > 0)
+            {
+                aes.KeySize = keySize.Value;
+            }
+            else if (aes.LegalKeySizes?.Length > 0)
+            {
+                aes.KeySize = aes.LegalKeySizes
+                    .Max(n => n.MaxSize);
+            }
+
             using var decryptor = aes.CreateDecryptor(key, iv);
             using var memoryStream = new MemoryStream(cipher);
             using var cryptoStream = new CryptoStream(memoryStream, decryptor, CryptoStreamMode.Read);
@@ -51,12 +67,28 @@ namespace Cryptography
         /// </summary>
         /// <param name="input">Input string.</param>
         /// <param name="passphrase">Passphrase to use.</param>
+        /// <param name="keySize">Key size to set.</param>
         /// <returns>Encrypted string.</returns>
-        public static string Encrypt(string input, string passphrase)
+        public static string Encrypt(
+            string input,
+            string passphrase,
+            int? keySize = null)
         {
             var key = CreateMd5Hash(passphrase);
 
             using var aes = Aes.Create();
+
+            if (keySize.HasValue &&
+                keySize.Value > 0)
+            {
+                aes.KeySize = keySize.Value;
+            }
+            else if (aes.LegalKeySizes?.Length > 0)
+            {
+                aes.KeySize = aes.LegalKeySizes
+                    .Max(n => n.MaxSize);
+            }
+
             using var encryptor = aes.CreateEncryptor(key, aes.IV);
             using var memoryStream = new MemoryStream();
             using var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write);
